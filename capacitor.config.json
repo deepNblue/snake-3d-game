@@ -1,0 +1,6 @@
+{
+  "appId": "com.snake3d.game",
+  "appName": "3D Snake",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}

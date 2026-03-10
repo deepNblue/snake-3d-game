@@ -1,0 +1,19 @@
+{
+  "name": "snake-3d-game",
+  "version": "1.0.0",
+  "description": "3D Snake Game - Android/Web",
+  "main": "index.js",
+  "scripts": {
+    "sync": "npx cap sync",
+    "android:build": "cd android && ./gradlew assembleDebug",
+    "android:open": "npx cap open android"
+  },
+  "keywords": ["snake", "game", "3d", "capacitor", "android"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0"
+  }
+}
