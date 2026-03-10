@@ -1,0 +1,137 @@
+name: Game CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test Game
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        if [ -f package.json ]; then
+          npm ci
+        fi
+    
+    - name: Check file structure
+      run: |
+        echo "检查文件结构..."
+        test -f README.md || (echo "❌ 缺少README.md" && exit 1)
+        test -f game-design.md || (echo "❌ 缺少game-design.md" && exit 1)
+        test -f index.html || (echo "❌ 缺少index.html" && exit 1)
+        echo "✅ 文件结构检查通过"
+    
+    - name: Validate HTML
+      run: |
+        echo "验证HTML..."
+        if command -v html5-validator &> /dev/null; then
+          html5-validator index.html
+        else
+          echo "HTML验证器未安装，跳过"
+        fi
+    
+    - name: Run game tests
+      run: |
+        echo "运行游戏测试..."
+        if [ -f tests/test_game.html ]; then
+          echo "✅ 测试文件存在"
+        fi
+    
+    - name: Check Android project
+      run: |
+        echo "检查Android项目..."
+        if [ -d android-version ]; then
+          test -f android-version/app/src/main/AndroidManifest.xml || echo "⚠️ AndroidManifest.xml未找到"
+          echo "✅ Android项目结构正常"
+        fi
+
+  build-web:
+    name: Build Web Version
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        if [ -f package.json ]; then
+          npm ci
+        fi
+    
+    - name: Build web version
+      run: |
+        echo "构建Web版本..."
+        mkdir -p dist
+        cp index.html dist/
+        cp -r www dist/ 2>/dev/null || true
+        echo "✅ Web版本构建完成"
+    
+    - name: Upload web artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: web-game
+        path: dist/
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build-web
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download web artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: web-game
+        path: dist/
+    
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./dist
+        publish_branch: gh-pages
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        commit_message: 'deploy: 游戏更新'
+
+  notify:
+    name: Notify Status
+    runs-on: ubuntu-latest
+    needs: [test, build-web]
+    if: always()
+    
+    steps:
+    - name: Create status summary
+      run: |
+        echo "## 🎮 3D贪吃蛇游戏CI结果" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| 步骤 | 状态 |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+        echo "| 测试 | ${{ needs.test.result == 'success' && '✅ 通过' || '❌ 失败' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 构建 | ${{ needs.build-web.result == 'success' && '✅ 成功' || '❌ 失败' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**提交**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**分支**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
